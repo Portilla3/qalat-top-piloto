@@ -1,6 +1,6 @@
 """
 app.py — QALAT · Sistema de Monitoreo de Resultados de Tratamiento
-v3.0 — filtro período + filtro centro
+v4.0 — login por país · Perú / Ecuador / UNODC
 """
 import streamlit as st
 import pandas as pd
@@ -19,8 +19,11 @@ from pipeline.runner   import run_script, run_paquetes_centros
 NAVY='#1F3864'; MID='#2E75B6'; ACCENT='#00B0F0'
 ORANGE='#C8590A'; RED='#C00000'; GREEN='#538135'; WHITE='#FFFFFF'
 
-st.set_page_config(page_title='QALAT · TOP · Sistema de Monitoreo de Resultados de Tratamiento', page_icon='📊',
-                   layout='wide', initial_sidebar_state='collapsed')
+st.set_page_config(
+    page_title='QALAT · TOP · Sistema de Monitoreo de Resultados de Tratamiento',
+    page_icon='📊', layout='wide', initial_sidebar_state='collapsed'
+)
+
 st.markdown(f"""<style>
 html,body,[class*="css"]{{font-family:'Calibri',sans-serif;}}
 .main{{background:#F8FAFD;}}
@@ -44,6 +47,9 @@ html,body,[class*="css"]{{font-family:'Calibri',sans-serif;}}
 .badge{{display:inline-block;padding:3px 10px;border-radius:12px;font-size:.78rem;font-weight:600;margin-right:4px;}}
 .badge-centro{{background:#E8F0FE;color:{NAVY};}}
 .badge-periodo{{background:#E8F5E9;color:#1B5E20;}}
+.login-box{{max-width:420px;margin:3rem auto;background:white;border-radius:12px;
+            padding:2rem 2.5rem;box-shadow:0 4px 20px rgba(31,56,100,.12);
+            border-top:5px solid {MID};}}
 div.stButton>button{{background:#1E7E34;color:white;border:none;
     padding:.6rem 2rem;border-radius:6px;font-size:1rem;font-weight:600;width:100%;
     box-shadow:0 2px 6px rgba(30,126,52,.35);letter-spacing:.3px;}}
@@ -51,25 +57,85 @@ div.stButton>button:hover{{background:#145222;box-shadow:0 3px 10px rgba(30,126,
 #MainMenu,footer,header{{visibility:hidden;}}
 </style>""", unsafe_allow_html=True)
 
-st.markdown("""<div class="qalat-hdr">
-  <h1>📊 QALAT · Monitoreo de Resultados de Tratamiento — Instrumento <span class="instrumento">TOP</span></h1>
-  <p>Procesamiento automático TOP · Sube tu Excel, aplica filtros y descarga todos los reportes</p>
-  <p style="margin-top:.6rem;font-size:.75rem;color:#7fa8cc;">© Rodrigo Portilla · UNODC</p>
-</div>""", unsafe_allow_html=True)
 
-with st.sidebar:
-    st.markdown('### 📋 Pasos')
-    st.markdown('1. Sube tu Excel bruto\n2. Aplica filtros (opcional)\n3. Elige reportes\n4. Clic en **Procesar**\n5. Descarga')
-    st.markdown('---')
-    st.caption(f'QALAT v3.0 · {datetime.now().strftime("%d/%m/%Y")}')
-    st.markdown('---')
+# ══════════════════════════════════════════════════════════════════════════════
+# SISTEMA DE LOGIN
+# ══════════════════════════════════════════════════════════════════════════════
+
+PAISES_CONFIG = {
+    'Perú':    {'flag': '🇵🇪', 'color': MID},
+    'Ecuador': {'flag': '🇪🇨', 'color': '#007A5E'},
+    'UNODC':   {'flag': '🌐', 'color': NAVY},
+}
+
+def _verificar_login(pais_sel, clave_ingresada):
+    """Verifica la clave contra Streamlit Secrets. Retorna True si es válida."""
+    key_map = {
+        'Perú':    'PASSWORD_PERU',
+        'Ecuador': 'PASSWORD_ECUADOR',
+        'UNODC':   'PASSWORD_UNODC',
+    }
+    secret_key = key_map.get(pais_sel)
+    if not secret_key:
+        return False
+    try:
+        return clave_ingresada == st.secrets[secret_key]
+    except Exception:
+        return False
+
+def _mostrar_login():
+    """Pantalla de login. Bloquea el resto de la app hasta autenticarse."""
+    st.markdown("""
+    <div style="text-align:center;margin-top:2rem;">
+      <div style="font-size:2.8rem;">📊</div>
+      <div style="font-size:1.8rem;font-weight:900;color:#1F3864;margin:.3rem 0;">QALAT · TOP</div>
+      <div style="font-size:1rem;color:#2E75B6;margin-bottom:2rem;">
+        Sistema de Monitoreo de Resultados de Tratamiento
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_l, col_c, col_r = st.columns([1, 1.4, 1])
+    with col_c:
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+        st.markdown(f'<p style="color:{NAVY};font-weight:700;font-size:1.1rem;margin-bottom:1.2rem;">🔐 Acceso al sistema</p>', unsafe_allow_html=True)
+
+        pais_sel = st.selectbox(
+            'Selecciona tu país / institución',
+            ['Perú', 'Ecuador', 'UNODC'],
+            format_func=lambda p: f"{PAISES_CONFIG[p]['flag']}  {p}",
+            key='login_pais'
+        )
+        clave = st.text_input('Contraseña', type='password', key='login_clave',
+                               placeholder='Ingresa tu contraseña')
+
+        if st.button('Ingresar →', use_container_width=True, key='btn_login'):
+            if _verificar_login(pais_sel, clave):
+                st.session_state['autenticado']  = True
+                st.session_state['rol_pais']     = pais_sel   # 'Perú', 'Ecuador' o 'UNODC'
+                st.rerun()
+            else:
+                st.error('❌ Contraseña incorrecta. Intenta nuevamente.')
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
     st.markdown(
-        '<div style="font-size:.75rem;color:#999;line-height:1.6;">'
-        '© Rodrigo Portilla<br>'
-        '<span style="color:#bbb;">UNODC Chile · Proyecto QALAT</span>'
-        '</div>',
+        '<p style="text-align:center;color:#aaa;font-size:.78rem;margin-top:2rem;">'
+        '© Rodrigo Portilla · UNODC Chile · Proyecto QALAT</p>',
         unsafe_allow_html=True
     )
+
+# ── Verificar sesión ──────────────────────────────────────────────────────────
+if not st.session_state.get('autenticado', False):
+    _mostrar_login()
+    st.stop()   # ← nada del resto del código se ejecuta si no hay sesión
+
+# ══════════════════════════════════════════════════════════════════════════════
+# A PARTIR DE AQUÍ: USUARIO AUTENTICADO
+# ══════════════════════════════════════════════════════════════════════════════
+rol        = st.session_state['rol_pais']          # 'Perú', 'Ecuador' o 'UNODC'
+es_unodc   = (rol == 'UNODC')
+pais_fijo  = None if es_unodc else rol             # el gobierno ve solo su país
 
 LABELS = {
     'caract_excel':('📋 Tablas caracterización',   'Excel',      '11 tablas al ingreso: sexo, edad, sustancias, transgresión'),
@@ -80,10 +146,47 @@ LABELS = {
     'pptx_seg':    ('📑 PPT seguimiento',           'PowerPoint', '6 slides · ingreso vs seguimiento'),
 }
 
-# ── Sección de carga ───────────────────────────────────────────────────────────
+# ── Header ────────────────────────────────────────────────────────────────────
+flag    = PAISES_CONFIG[rol]['flag']
+rol_lbl = f'{flag} {rol}'
+st.markdown(f"""<div class="qalat-hdr">
+  <h1>📊 QALAT · Monitoreo de Resultados de Tratamiento — Instrumento <span class="instrumento">TOP</span></h1>
+  <p>Procesamiento automático TOP · Sube tu Excel, aplica filtros y descarga todos los reportes</p>
+  <p style="margin-top:.4rem;font-size:.8rem;color:#9DC3E6;">
+    Sesión activa: <b>{rol_lbl}</b>
+    &nbsp;·&nbsp;
+    <span style="cursor:pointer;text-decoration:underline;" onclick="window.location.reload()">
+      Cerrar sesión
+    </span>
+  </p>
+  <p style="margin-top:.2rem;font-size:.75rem;color:#7fa8cc;">© Rodrigo Portilla · UNODC</p>
+</div>""", unsafe_allow_html=True)
+
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown('### 📋 Pasos')
+    st.markdown('1. Sube tu Excel bruto\n2. Aplica filtros (opcional)\n3. Elige reportes\n4. Clic en **Procesar**\n5. Descarga')
+    st.markdown('---')
+    st.caption(f'QALAT v4.0 · {datetime.now().strftime("%d/%m/%Y")}')
+    st.markdown(f'**Sesión:** {rol_lbl}')
+    st.markdown('---')
+    if st.button('🚪 Cerrar sesión', use_container_width=True, key='btn_logout'):
+        for k in ['autenticado','rol_pais','supabase_path','supabase_df',
+                  'filename','result','outputs','seleccion','wide_path','work_dir','raw_path']:
+            st.session_state.pop(k, None)
+        st.rerun()
+    st.markdown('---')
+    st.markdown(
+        '<div style="font-size:.75rem;color:#999;line-height:1.6;">'
+        '© Rodrigo Portilla<br>'
+        '<span style="color:#bbb;">UNODC Chile · Proyecto QALAT</span>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+# ── Sección de carga ──────────────────────────────────────────────────────────
 st.markdown('<div class="sec">📁 Cargar base de datos</div>', unsafe_allow_html=True)
 
-# ── Selector de fuente ────────────────────────────────────────────────────────
 fuente = st.radio(
     'Fuente de datos',
     ['📁 Subir Excel (JotForm)', '📡 Conectar con Supabase (Piloto)'],
@@ -95,31 +198,43 @@ uploaded      = None
 supabase_data = None
 
 if fuente == '📡 Conectar con Supabase (Piloto)':
-    st.markdown(
-        '<div style="background:#EEF4FB;border-left:4px solid #2E75B6;'
-        'padding:.8rem 1.2rem;border-radius:6px;margin-bottom:1rem;">'
-        '<b>📡 Conexión directa a Supabase</b><br>'
-        'Descarga los registros capturados en el formulario web del piloto (Perú / Ecuador). '
-        'Filtra por país antes de procesar.'
-        '</div>',
-        unsafe_allow_html=True
-    )
 
-    col_pais, col_btn = st.columns([2, 1])
-    with col_pais:
-        pais_filtro = st.selectbox('Filtrar por país', ['Todos', 'Perú', 'Ecuador'], key='pais_sb')
-    with col_btn:
-        st.markdown('<div style="margin-top:28px"></div>', unsafe_allow_html=True)
+    # ── Selector de país (solo UNODC puede elegir) ────────────────────────────
+    if es_unodc:
+        st.markdown(
+            '<div style="background:#EEF4FB;border-left:4px solid #2E75B6;'
+            'padding:.8rem 1.2rem;border-radius:6px;margin-bottom:1rem;">'
+            '<b>🌐 Vista UNODC</b> — Puedes ver datos de todos los países o filtrar por uno.'
+            '</div>',
+            unsafe_allow_html=True
+        )
+        col_pais, col_btn = st.columns([2, 1])
+        with col_pais:
+            pais_filtro = st.selectbox('Ver datos de', ['Todos', 'Perú', 'Ecuador'], key='pais_sb')
+        with col_btn:
+            st.markdown('<div style="margin-top:28px"></div>', unsafe_allow_html=True)
+            cargar_sb = st.button('📥 Descargar datos', use_container_width=True, key='btn_sb')
+    else:
+        # El gobierno ve SOLO su país — sin selector, sin opción de ver el otro
+        pais_filtro = pais_fijo
+        st.markdown(
+            f'<div style="background:#EEF4FB;border-left:4px solid #2E75B6;'
+            f'padding:.8rem 1.2rem;border-radius:6px;margin-bottom:1rem;">'
+            f'<b>📡 Conexión directa a Supabase</b><br>'
+            f'Descarga los registros de <b>{flag} {pais_fijo}</b> capturados en el formulario web del piloto.'
+            f'</div>',
+            unsafe_allow_html=True
+        )
         cargar_sb = st.button('📥 Descargar datos', use_container_width=True, key='btn_sb')
 
     if cargar_sb:
         try:
-            import urllib.request, urllib.parse, json, tempfile, os
+            import urllib.request, urllib.parse, json
             SUPABASE_URL = st.secrets['SUPABASE_URL']
             SUPABASE_KEY = st.secrets['SUPABASE_KEY']
 
             url = f"{SUPABASE_URL}/rest/v1/top_registros?select=*"
-            if pais_filtro != 'Todos':
+            if pais_filtro and pais_filtro != 'Todos':
                 pais_encoded = urllib.parse.quote(pais_filtro)
                 url += f"&pais=eq.{pais_encoded}"
             url += "&order=fecha_entrevista.asc"
@@ -135,7 +250,8 @@ if fuente == '📡 Conectar con Supabase (Piloto)':
                 st.warning('⚠ No hay registros en Supabase para ese filtro.')
             else:
                 df_sb = pd.DataFrame(registros)
-                st.success(f'✓ {len(df_sb)} registros descargados de Supabase')
+                pais_label = pais_filtro if pais_filtro else 'Todos'
+                st.success(f'✓ {len(df_sb)} registros descargados de Supabase ({pais_label})')
 
                 # ── Mapear columnas Supabase → nombres que reconoce el pipeline ──
                 rename_map = {
@@ -204,13 +320,12 @@ if fuente == '📡 Conectar con Supabase (Piloto)':
                 }
                 df_sb = df_sb.rename(columns={k: v for k, v in rename_map.items() if k in df_sb.columns})
 
-                # Guardar como Excel temporal para que lo procese el pipeline
                 tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
                 df_sb.to_excel(tmp.name, index=False)
                 tmp.close()
                 st.session_state['supabase_path'] = tmp.name
                 st.session_state['supabase_df']   = df_sb
-                st.session_state['filename']       = f'Supabase_{pais_filtro}'
+                st.session_state['filename']       = f'Supabase_{pais_label}'
                 supabase_data = df_sb
 
         except KeyError:
@@ -223,9 +338,11 @@ if fuente == '📡 Conectar con Supabase (Piloto)':
         supabase_data = st.session_state.get('supabase_df')
 
 else:
-    uploaded = st.file_uploader('Arrastra tu Excel aquí o haz clic para buscar',
-                                 type=['xlsx','xls'],
-                                 help='Archivo bruto exportado de Jotform — instrumento TOP')
+    uploaded = st.file_uploader(
+        'Arrastra tu Excel aquí o haz clic para buscar',
+        type=['xlsx','xls'],
+        help='Archivo bruto exportado de Jotform — instrumento TOP'
+    )
 
 # ── Filtros (solo visibles si hay archivo o datos Supabase) ───────────────────
 filtro_centro_val = None
@@ -233,11 +350,9 @@ fecha_desde_val   = None
 fecha_hasta_val   = None
 centros_disponibles = []
 
-# Determinar fuente activa
 tiene_datos = uploaded is not None or supabase_data is not None
 
 if uploaded:
-    # Leer solo las columnas de centro y fecha para poblar los filtros
     @st.cache_data(show_spinner=False)
     def _leer_preview(file_bytes):
         import pandas as _pd, io, unicodedata
@@ -264,27 +379,21 @@ if uploaded:
     with fc1:
         st.markdown('<div class="filter-box"><h4>🏥 Filtrar por centro</h4>', unsafe_allow_html=True)
         opciones_centro = ['Todos los centros'] + centros_disponibles
-        sel_centro = st.selectbox('Centro / Servicio', opciones_centro,
-                                   label_visibility='collapsed')
+        sel_centro = st.selectbox('Centro / Servicio', opciones_centro, label_visibility='collapsed')
         if sel_centro != 'Todos los centros':
             filtro_centro_val = sel_centro
         st.markdown('</div>', unsafe_allow_html=True)
 
     with fc2:
         st.markdown('<div class="filter-box"><h4>📅 Filtrar por período</h4>', unsafe_allow_html=True)
-        MESES = ['Ene','Feb','Mar','Abr','May','Jun',
-                 'Jul','Ago','Sep','Oct','Nov','Dic']
+        MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
         anio_actual = datetime.now().year
-
-        # Rango de años disponibles en la base
         if len(fechas_serie):
             anio_min = max(fechas_serie.dt.year.min(), anio_actual - 10)
             anio_max = min(fechas_serie.dt.year.max(), anio_actual + 1)
         else:
             anio_min, anio_max = anio_actual - 3, anio_actual
-
         anios = list(range(int(anio_min), int(anio_max)+1))
-
         p1, p2 = st.columns(2)
         with p1:
             st.caption('Desde')
@@ -294,13 +403,10 @@ if uploaded:
             st.caption('Hasta')
             mes_h  = st.selectbox('Mes fin',   MESES, index=11,   key='mes_h', label_visibility='collapsed')
             anio_h = st.selectbox('Año fin',   anios, index=len(anios)-1, key='anio_h', label_visibility='collapsed')
-
         usar_periodo = st.checkbox('Aplicar filtro de período', value=False)
         if usar_periodo:
-            mes_d_n  = MESES.index(mes_d)  + 1
-            mes_h_n  = MESES.index(mes_h)  + 1
-            fecha_desde_val = f'{anio_d}-{mes_d_n:02d}'
-            fecha_hasta_val = f'{anio_h}-{mes_h_n:02d}'
+            fecha_desde_val = f'{anio_d}-{MESES.index(mes_d)+1:02d}'
+            fecha_hasta_val = f'{anio_h}-{MESES.index(mes_h)+1:02d}'
         st.markdown('</div>', unsafe_allow_html=True)
 
     with fc3:
@@ -319,7 +425,6 @@ if uploaded:
         'pptx_caract':  cb_ppc,'pptx_seg':  cb_pps,
     }
 
-    # ── Resumen de filtros activos ─────────────────────────────────────────────
     badges = ''
     if filtro_centro_val:
         badges += f'<span class="badge badge-centro">🏥 Centro: {filtro_centro_val}</span>'
@@ -328,17 +433,12 @@ if uploaded:
     if not badges:
         badges = '<span style="color:#888;font-size:.85rem">Sin filtros — procesa toda la base</span>'
 
-    st.markdown(f'**Archivo:** `{uploaded.name}` &nbsp;|&nbsp; {badges}',
-                unsafe_allow_html=True)
+    st.markdown(f'**Archivo:** `{uploaded.name}` &nbsp;|&nbsp; {badges}', unsafe_allow_html=True)
 
-    # ── Botón procesar ─────────────────────────────────────────────────────────
     if st.button('⚡ Procesar y generar reportes', use_container_width=True):
-
         with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
             tmp.write(uploaded.read()); tmp_raw = tmp.name
-
         work_dir = tempfile.mkdtemp(prefix='qalat_')
-
         try:
             with st.spinner('Paso 1/7 — Procesando base Wide...'):
                 result = procesar_wide(
@@ -350,15 +450,12 @@ if uploaded:
                 st.session_state['result']    = result
                 st.session_state['filename']  = uploaded.name
                 st.session_state['seleccion'] = SELECCION
-
                 wide_path = os.path.join(work_dir, 'TOP_Base_Wide.xlsx')
                 with open(wide_path,'wb') as f:
                     f.write(result['excel_bytes'].getvalue())
                 st.session_state['wide_path'] = wide_path
                 st.session_state['work_dir']  = work_dir
-
             st.success(f"✅ Base Wide — {result['stats']['N_total']} pacientes · {result['periodo']}")
-
             outputs = {}
             keys_sel = [k for k,v in SELECCION.items() if v]
             prog = st.progress(0, text='Generando reportes...')
@@ -366,23 +463,19 @@ if uploaded:
                 lbl = LABELS[key][0]
                 prog.progress(i/len(keys_sel), text=f'Generando {lbl}...')
                 try:
-                    buf, fname, mime = run_script(key, wide_path,
-                                                  filtro_centro=filtro_centro_val)
+                    buf, fname, mime = run_script(key, wide_path, filtro_centro=filtro_centro_val)
                     outputs[key] = {'ok':True,'buf':buf,'fname':fname,'mime':mime}
                 except Exception as e:
                     outputs[key] = {'ok':False,'error':str(e)}
             prog.progress(1.0, text='✅ Listo')
             st.session_state['outputs'] = outputs
-
         except Exception as e:
             st.error(f'❌ Error: {e}')
         finally:
             st.session_state['raw_path'] = tmp_raw
 
 elif supabase_data is not None:
-    # ── Filtros para datos Supabase ───────────────────────────────────────────
     col_centro_sb = 'Código del centro de tratamiento'
-    col_fecha_sb  = 'Fecha de entrevista TOP'
     centros_disponibles = []
     if col_centro_sb in supabase_data.columns:
         centros_disponibles = sorted(supabase_data[col_centro_sb].dropna().astype(str).str.strip().unique().tolist())
@@ -455,9 +548,7 @@ elif supabase_data is not None:
                     f.write(result['excel_bytes'].getvalue())
                 st.session_state['wide_path'] = wide_path
                 st.session_state['work_dir']  = work_dir
-
             st.success(f"✅ Base Wide — {result['stats']['N_total']} pacientes · {result['periodo']}")
-
             outputs = {}
             keys_sel = [k for k,v in SELECCION.items() if v]
             prog = st.progress(0, text='Generando reportes...')
@@ -471,7 +562,6 @@ elif supabase_data is not None:
                     outputs[key] = {'ok':False,'error':str(e)}
             prog.progress(1.0, text='✅ Listo')
             st.session_state['outputs'] = outputs
-
         except Exception as e:
             st.error(f'❌ Error al procesar datos Supabase: {e}')
 
@@ -483,7 +573,6 @@ if 'result' in st.session_state:
     s = R['stats']; wide = R['wide']
     fc = R.get('filtro_centro'); fd = R.get('fecha_desde'); fh = R.get('fecha_hasta')
 
-    # Badge de filtros aplicados
     filtro_str = ''
     if fc:   filtro_str += f' · Centro: {fc}'
     if fd:   filtro_str += f' · {fd} → {fh}'
@@ -492,7 +581,6 @@ if 'result' in st.session_state:
     st.markdown(f'<div class="sec">📊 Resultados — {R["periodo"]}{filtro_str}</div>',
                 unsafe_allow_html=True)
 
-    # KPIs
     k1,k2,k3,k4,k5,k6 = st.columns(6)
     for col,lbl,val,sub,cls in [
         (k1,'Pacientes únicos',       s['N_total'], '',                          ''),
@@ -508,15 +596,13 @@ if 'result' in st.session_state:
                         f'{"<div class=kpi-sub>"+sub+"</div>" if sub else ""}</div>',
                         unsafe_allow_html=True)
 
-    # Tabla centros
     centros = R.get('centros', [])
-    if centros and not fc:   # Solo mostrar si no hay filtro de centro
+    if centros and not fc:
         st.markdown('<div class="sec">🏥 Resumen por Centro / Servicio de Tratamiento</div>',
                     unsafe_allow_html=True)
         df_c = pd.DataFrame(centros)
         df_c.columns = ['Centro','Aplicaciones','Pacientes únicos',
                          'Con TOP2','Sin TOP2 (pendientes)','Valores corregidos']
-
         rows_html = ''
         for i, row in df_c.iterrows():
             is_total = str(row.iloc[0]) == 'TOTAL'
@@ -530,7 +616,6 @@ if 'result' in st.session_state:
                 weight= 'font-weight:700;' if is_total or corr else ''
                 cells += f'<td style="padding:7px 12px;text-align:{align};color:{color};{weight}">{val}</td>'
             rows_html += f'<tr style="{bg}">{cells}</tr>'
-
         hdrs = ''.join(f'<th style="padding:9px 12px;text-align:{"left" if i==0 else "center"};'
                        f'background:{NAVY};color:white;font-size:.85rem;">{c}</th>'
                        for i,c in enumerate(df_c.columns))
@@ -539,7 +624,6 @@ if 'result' in st.session_state:
                     f'<thead><tr>{hdrs}</tr></thead><tbody>{rows_html}</tbody></table></div>',
                     unsafe_allow_html=True)
 
-    # Gráficos
     st.markdown('<div class="sec">📈 Análisis visual</div>', unsafe_allow_html=True)
     gc1,gc2,gc3 = st.columns(3)
 
@@ -588,7 +672,6 @@ if 'result' in st.session_state:
         ax.set_facecolor('#F8FAFD');fig.patch.set_facecolor('#F8FAFD')
         plt.tight_layout();st.pyplot(fig);plt.close()
 
-    # Pendientes
     pend=wide[wide['Alerta_TOP2'].isin(['🟠 60-89 dias','🔴 90+ dias'])].copy()
     if len(pend):
         st.markdown('<div class="sec">🚨 Pendientes urgentes</div>', unsafe_allow_html=True)
@@ -608,7 +691,6 @@ if 'result' in st.session_state:
     with st.expander('📋 Log de procesamiento'):
         for log in R['logs']: st.text(log)
 
-    # DESCARGAS
     st.markdown('---')
     st.markdown('<div class="sec">⬇️ Descargar reportes</div>', unsafe_allow_html=True)
 
@@ -619,7 +701,6 @@ if 'result' in st.session_state:
     outputs   = st.session_state.get('outputs',{})
     sel       = st.session_state.get('seleccion',{})
 
-    # Fila 1
     d1,d2,d3=st.columns(3)
     with d1:
         st.markdown('<div class="outcard"><h4>📊 Base Wide completa</h4>'
@@ -667,14 +748,10 @@ if 'result' in st.session_state:
                     file_name=o['fname'],mime=o['mime'],use_container_width=True,key=dlkey)
             else: st.warning(f"⚠️ {o.get('error','Error')[:100]}")
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # DISTRIBUCIÓN POR CENTROS
-    # ══════════════════════════════════════════════════════════════════════════
+    # ── Distribución por centros (solo si no hay filtro de centro activo) ──────
     if 'wide_path' in st.session_state and not filtro_centro_val:
         st.markdown('---')
-        st.markdown('<div class="sec">📦 Distribución por centros</div>',
-                    unsafe_allow_html=True)
-
+        st.markdown('<div class="sec">📦 Distribución por centros</div>', unsafe_allow_html=True)
         st.markdown(
             '<div style="background:#EEF4FB;border-left:4px solid #2E75B6;'
             'padding:.8rem 1.2rem;border-radius:6px;margin-bottom:1rem;">'
@@ -686,7 +763,6 @@ if 'result' in st.session_state:
             unsafe_allow_html=True
         )
 
-        # Selector de reportes a incluir
         st.markdown('**Selecciona qué incluir en cada paquete:**')
         dc1, dc2, dc3 = st.columns(3)
         with dc1:
@@ -708,9 +784,7 @@ if 'result' in st.session_state:
         n_centros = len(centros_disponibles)
         st.caption(f'Se generarán **{n_centros} carpetas** — una por cada centro detectado')
 
-        if st.button('📦 Generar paquetes por centro', use_container_width=True,
-                     key='btn_dist'):
-
+        if st.button('📦 Generar paquetes por centro', use_container_width=True, key='btn_dist'):
             wide_path_dist = st.session_state['wide_path']
             status_box = st.empty()
             prog_dist  = st.progress(0, text='Iniciando...')
@@ -730,15 +804,10 @@ if 'result' in st.session_state:
                         progress_cb=_cb,
                         raw_input_path=st.session_state.get('raw_path')
                     )
-
                 today_str = datetime.now().strftime('%Y-%m-%d')
                 zip_name  = f'QALAT_Paquetes_Centros_{today_str}.zip'
-
                 prog_dist.progress(1.0, text='✅ Listo')
-                status_box.success(
-                    f'✅ ZIP generado con {n_centros} carpetas · {len(keys_dist)} reportes por centro'
-                )
-
+                status_box.success(f'✅ ZIP generado con {n_centros} carpetas · {len(keys_dist)} reportes por centro')
                 st.download_button(
                     label=f'⬇️ Descargar ZIP ({n_centros} centros)',
                     data=zip_buf.getvalue(),
@@ -747,13 +816,12 @@ if 'result' in st.session_state:
                     use_container_width=True,
                     key='dl_dist'
                 )
-
             except Exception as e:
                 st.error(f'❌ Error generando paquetes: {e}')
 
 if not uploaded and 'result' not in st.session_state:
     st.markdown("""<div style="text-align:center;padding:3rem;color:#888;">
         <div style="font-size:3rem;">📤</div>
-        <div style="font-size:1.1rem;margin-top:1rem;">Sube tu Excel para comenzar</div>
+        <div style="font-size:1.1rem;margin-top:1rem;">Sube tu Excel o conecta con Supabase para comenzar</div>
         <div style="font-size:.85rem;margin-top:.5rem;color:#aaa;">Base bruta exportada de Jotform · instrumento TOP</div>
     </div>""", unsafe_allow_html=True)
