@@ -239,9 +239,17 @@ def procesar_wide(input_path: str,
         if len(grp) >= 2: top2_rows.append(grp.loc[1])
 
     df_top1 = pd.DataFrame(top1_rows).reset_index(drop=True)
-    df_top2 = pd.DataFrame(top2_rows).reset_index(drop=True)
-    df_top2_alin = (df_top2.set_index(COL_CODIGO)
-                    .reindex(df_top1[COL_CODIGO]).reset_index())
+    if top2_rows:
+        df_top2 = pd.DataFrame(top2_rows).reset_index(drop=True)
+        df_top2_alin = (df_top2.set_index(COL_CODIGO)
+                        .reindex(df_top1[COL_CODIGO]).reset_index())
+    else:
+        # Sin ningún TOP2: crear DataFrame vacío con las mismas columnas que df_top1
+        df_top2 = pd.DataFrame(columns=df_top1.columns)
+        df_top2_alin = pd.DataFrame(
+            {COL_CODIGO: df_top1[COL_CODIGO],
+             **{c: np.nan for c in df_top1.columns if c != COL_CODIGO}}
+        )
 
     otras_cols = [c for c in df_top1.columns if c != COL_CODIGO]
     t1 = df_top1.rename(columns={c: f'{c}_TOP1' for c in otras_cols})
