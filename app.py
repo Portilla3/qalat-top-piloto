@@ -114,13 +114,14 @@ if fuente == '📡 Conectar con Supabase (Piloto)':
 
     if cargar_sb:
         try:
-            import urllib.request, json, tempfile, os
+            import urllib.request, urllib.parse, json, tempfile, os
             SUPABASE_URL = st.secrets['SUPABASE_URL']
             SUPABASE_KEY = st.secrets['SUPABASE_KEY']
 
             url = f"{SUPABASE_URL}/rest/v1/top_registros?select=*"
             if pais_filtro != 'Todos':
-                url += f"&pais=eq.{pais_filtro}"
+                pais_encoded = urllib.parse.quote(pais_filtro)
+                url += f"&pais=eq.{pais_encoded}"
             url += "&order=fecha_entrevista.asc"
 
             req = urllib.request.Request(url, headers={
@@ -128,7 +129,7 @@ if fuente == '📡 Conectar con Supabase (Piloto)':
                 'Authorization': f'Bearer {SUPABASE_KEY}'
             })
             with urllib.request.urlopen(req) as resp:
-                registros = json.loads(resp.read().decode())
+                registros = json.loads(resp.read().decode('utf-8'))
 
             if not registros:
                 st.warning('⚠ No hay registros en Supabase para ese filtro.')
