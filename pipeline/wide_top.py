@@ -108,10 +108,10 @@ def procesar_wide(input_path: str,
     logs.append(f"✓ Archivo cargado: {len(df)} filas × {len(df.columns)} columnas")
 
     COL_CODIGO = auto_col(df.columns,
-        keywords=['identificacion','identificación','2 primeras letras','primer nombre','cod_pac','id_pac'],
+        keywords=['identificacion','identificación','2 primeras letras','primer nombre','cod_pac','id_pac','codigo_paciente','codigo paciente'],
         nombre_col='Código de identificación del paciente')
     COL_FECHA = auto_col(df.columns,
-        keywords=['fecha entrevista','fecha_entrevista','fecha de entrevista','fechaentrevista'],
+        keywords=['fecha entrevista','fecha_entrevista','fecha de entrevista','fechaentrevista','fecha_entrevista'],
         nombre_col='Fecha de Entrevista')
     logs.append(f"✓ Columna código: {COL_CODIGO[:50]}")
     logs.append(f"✓ Columna fecha: {COL_FECHA}")
@@ -124,7 +124,7 @@ def procesar_wide(input_path: str,
     COL_CENTRO = None
     for c in df.columns:
         nc = _norm_str(c)
-        if any(k in nc for k in ['codigo del centro','centro de tratamiento','servicio de tratamiento']):
+        if any(k in nc for k in ['codigo del centro','centro de tratamiento','servicio de tratamiento','centro']):
             if 'trabajo' not in nc and 'estudio' not in nc:
                 COL_CENTRO = c; break
 
@@ -166,7 +166,7 @@ def procesar_wide(input_path: str,
     for c in df.columns:
         if c == COL_CODIGO: continue
         nc = _norm_str(c)
-        if any(k in nc for k in ['fecha de nacimiento','fecha_nacimiento','fecha nac','fechanac']):
+        if any(k in nc for k in ['fecha de nacimiento','fecha_nacimiento','fecha nac','fechanac','nacimiento']):
             COL_FN = c; break
 
     if COL_FN:
